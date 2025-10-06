@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: livetheword
+    env: docker
+    plan: free
+    autoDeploy: true
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
