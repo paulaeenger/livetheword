@@ -277,3 +277,29 @@ def load_talks():
     st.stop()
 
 talks_df = load_talks()
+
+# === Browse General Conference talks ===
+with st.expander("Browse General Conference talks"):
+    import pandas as pd
+    years = sorted({int(y) for y in talks_df["year"].dropna().unique()}, reverse=True)
+
+    bc1, bc2, bc3 = st.columns([1,1,2])
+    with bc1:
+        byear = st.selectbox("Year", years, index=0)
+    with bc2:
+        months = ["April","October"]
+        bmonth = st.selectbox("Month", months, index=0)
+
+    subset = talks_df[(talks_df["year"]==byear) & (talks_df["month"]==bmonth)].copy()
+    subset = subset.sort_values("title")
+
+    with bc3:
+        if subset.empty:
+            st.write("No talks found for that session.")
+        else:
+            titles = subset["title"].tolist()
+            choice = st.selectbox("Talk", titles, index=0, key=f"talk_{byear}_{bmonth}")
+            sel = subset[subset["title"]==choice].iloc[0]
+            st.markdown(f"**Speaker:** {str(sel.get('speaker','')).strip()}")
+            st.markdown(f"[Open on churchofjesuschrist.org]({str(sel['url']).strip()})")
+# === end browse talks ===
