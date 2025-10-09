@@ -1,17 +1,17 @@
-ï»¿import os, json
+import os, json
 import streamlit as st
 
 # =========================
 # Config / Environment
 # =========================
-st.set_page_config(page_title="Scripture Summary", page_icon="ðŸ“–", layout="wide")
+st.set_page_config(page_title="Scripture Summary", page_icon="??", layout="wide")
 
 # Read key from Streamlit secrets first, then env var
 OPENAI_API_KEY = (st.secrets.get("OPENAI_API_KEY","") or os.getenv("OPENAI_API_KEY","")).strip()
 MODEL = "gpt-4.1-mini-2025-04-14"
 
 if not OPENAI_API_KEY:
-    st.error("OPENAI_API_KEY is not set. In Streamlit Cloud, add it under Settings â†’ Secrets. Locally, set env var before running.")
+    st.error("OPENAI_API_KEY is not set. In Streamlit Cloud, add it under Settings ? Secrets. Locally, set env var before running.")
     st.stop()
 
 try:
@@ -129,7 +129,7 @@ def canon_by_key(k:str):
     return CANONS[0]
 
 # =========================
-# UI â€” selectors OUTSIDE the form so they update live
+# UI — selectors OUTSIDE the form so they update live
 # =========================
 st.title("Scripture Summary")
 
@@ -156,7 +156,7 @@ with c3:
     chapter = st.selectbox("Chapter", options=list(range(1, chapters+1)), index=0)
 
 # =========================
-# Form â€” search/focus/length + submit
+# Form — search/focus/length + submit
 # =========================
 with st.form("summary_form"):
     d1, d2, d3 = st.columns([2,2,1])
@@ -205,7 +205,7 @@ error_msg = None
 if submitted:
     reference = search.strip() if search.strip() else f"{book} {chapter}"
     try:
-        with st.spinner("Summarizingâ€¦"):
+        with st.spinner("Summarizing…"):
             resp = client.chat.completions.create(
                 model=MODEL,
                 temperature=0.2,
@@ -261,4 +261,5 @@ if result:
     with colB:
         st.code(md, language="markdown")
 
-st.caption('Tip: Choose a Scripture set, then pick book + chapter â€” or enter a theme/range like "Mosiah 2-5".')
+st.caption('Tip: Choose a Scripture set, then pick book + chapter — or enter a theme/range like "Mosiah 2-5".')
+
