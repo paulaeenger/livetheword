@@ -1,4 +1,4 @@
-﻿import os, json, textwrap
+﻿import os, json
 import streamlit as st
 
 # =========================
@@ -6,14 +6,14 @@ import streamlit as st
 # =========================
 st.set_page_config(page_title="Scripture Summary", page_icon="📖", layout="wide")
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+# Read key from Streamlit secrets first, then env var
+OPENAI_API_KEY = (st.secrets.get("OPENAI_API_KEY","") or os.getenv("OPENAI_API_KEY","")).strip()
 MODEL = "gpt-4.1-mini-2025-04-14"
 
 if not OPENAI_API_KEY:
     st.error("OPENAI_API_KEY is not set. In Streamlit Cloud, add it under Settings → Secrets. Locally, set env var before running.")
     st.stop()
 
-# Defer import so app still loads if key missing
 try:
     from openai import OpenAI
     client = OpenAI(api_key=OPENAI_API_KEY)
@@ -52,12 +52,10 @@ Guidelines:
 
 def length_guidance(length: str) -> str:
     if length == "brief":
-        return ("CRITICAL: Keep responses VERY concise. "
-                "Overview and context: 1-2 sentences each. "
+        return ("CRITICAL: Keep responses VERY concise. Overview and context: 1-2 sentences each. "
                 "Summary: 2-3 sentences max. Lists: 2-3 items each.")
     if length == "deep":
-        return ("CRITICAL: Provide COMPREHENSIVE analysis. "
-                "Overview and context: 3-5 sentences each with rich detail. "
+        return ("CRITICAL: Provide COMPREHENSIVE analysis. Overview and context: 3-5 sentences each with rich detail. "
                 "Summary: 6+ sentences with thorough exploration. Lists: 5-8 items each with depth.")
     return ("Provide balanced detail. Overview and context: 2-3 sentences each. "
             "Summary: 3-5 sentences. Lists: 3-5 items each.")
@@ -117,16 +115,12 @@ CANONS = [
             {"name":"Jude","chapters":1},{"name":"Revelation","chapters":22}
         ]
     },
-    {
-        "key":"dc","name":"Doctrine and Covenants","books":[{"name":"Doctrine and Covenants","chapters":138}]
-    },
-    {
-        "key":"pgp","name":"Pearl of Great Price","books":[
-            {"name":"Moses","chapters":8},{"name":"Abraham","chapters":5},
-            {"name":"Joseph Smith-Matthew","chapters":1},{"name":"Joseph Smith-History","chapters":1},
-            {"name":"Articles of Faith","chapters":1}
-        ]
-    }
+    {"key":"dc","name":"Doctrine and Covenants","books":[{"name":"Doctrine and Covenants","chapters":138}]},
+    {"key":"pgp","name":"Pearl of Great Price","books":[
+        {"name":"Moses","chapters":8},{"name":"Abraham","chapters":5},
+        {"name":"Joseph Smith-Matthew","chapters":1},{"name":"Joseph Smith-History","chapters":1},
+        {"name":"Articles of Faith","chapters":1}
+    ]}
 ]
 
 def canon_by_key(k:str):
@@ -135,39 +129,47 @@ def canon_by_key(k:str):
     return CANONS[0]
 
 # =========================
-# UI: selectors (canon → book → chapter) + free search
+# UI — selectors OUTSIDE the form so they update live
 # =========================
 st.title("Scripture Summary")
 
-with st.form("selectors"):
-    c1,c2,c3 = st.columns([1,1,1])
-    with c1:
-        canon_key = st.selectbox(
-            "Scripture set",
-            options=[c["key"] for c in CANONS],
-            format_func=lambda k: canon_by_key(k)["name"],
-            index=2  # default NT
-        )
-    canon = canon_by_key(canon_key)
-    book_names = [b["name"] for b in canon["books"]]
-    with c2:
-        book = st.selectbox("Book", options=book_names, index=book_names.index("John") if "John" in book_names else 0)
-    chapters = next(b["chapters"] for b in canon["books"] if b["name"] == book)
-    with c3:
-        chapter = st.selectbox("Chapter", options=list(range(1, chapters+1)), index=min(2, chapters-1))
+c1, c2, c3 = st.columns([1,1,1])
+with c1:
+    canon_key = st.selectbox(
+        "Scripture set",
+        options=[c["key"] for c in CANONS],
+        format_func=lambda k: canon_by_key(k)["name"],
+        index=2  # default NT
+    )
+canon = canon_by_key(canon_key)
+book_names = [b["name"] for b in canon["books"]]
 
-    d1,d2,d3 = st.columns([2,2,1])
+with c2:
+    # Use first book by default for each canon
+    default_book_index = 0
+    if "John" in book_names and canon_key == "nt":
+        default_book_index = book_names.index("John")
+    book = st.selectbox("Book", options=book_names, index=default_book_index)
+
+chapters = next(b["chapters"] for b in canon["books"] if b["name"] == book)
+with c3:
+    chapter = st.selectbox("Chapter", options=list(range(1, chapters+1)), index=0)
+
+# =========================
+# Form — search/focus/length + submit
+# =========================
+with st.form("summary_form"):
+    d1, d2, d3 = st.columns([2,2,1])
     with d1:
         search = st.text_input('Or search (theme or range)', placeholder='e.g., "charity" or "Mosiah 2-5"')
     with d2:
         focus = st.text_input("Focus (optional)", placeholder="e.g., overcoming doubt, leadership, covenants")
     with d3:
         length = st.selectbox("Length", ["brief","standard","deep"], index=1)
-
     submitted = st.form_submit_button("Get Summary")
 
 # =========================
-# Call OpenAI
+# Prompt helpers
 # =========================
 def build_user_prompt(reference:str, focus:str, length:str) -> str:
     return (
@@ -194,6 +196,9 @@ def to_markdown(obj:dict) -> str:
             + lst("Cross-References", obj.get("cross_references"))
             + "\n")
 
+# =========================
+# Call OpenAI
+# =========================
 result = None
 error_msg = None
 
@@ -210,13 +215,10 @@ if submitted:
                 ],
             )
         text = resp.choices[0].message.content
-        # Basic sanitation similar to your PS script
-        replacements = {
-            "\u2019":"'","\u201C":'"',"\u201D":'"',"\u2013":"-","\u2014":"-"
-        }
+        # Sanitize common smart punctuation
+        replacements = {"\u2019":"'","\u201C":'"',"\u201D":'"',"\u2013":"-","\u2014":"-"}
         for k,v in replacements.items():
             text = text.replace(k,v)
-
         result = json.loads(text)
     except Exception as e:
         error_msg = f"OpenAI error: {e}"
@@ -253,9 +255,10 @@ if result:
     md = to_markdown(result)
     colA, colB = st.columns(2)
     with colA:
-        st.download_button("Download .md", data=md.encode("utf-8"), file_name=f"{(result.get('reference') or 'summary').replace(' ','_')}.md", mime="text/markdown")
+        st.download_button("Download .md", data=md.encode("utf-8"),
+                           file_name=f"{(result.get('reference') or 'summary').replace(' ','_')}.md",
+                           mime="text/markdown")
     with colB:
         st.code(md, language="markdown")
 
-# Helpful footer
-st.caption("Tip: Choose a Scripture set, then pick book + chapter — or enter a theme/range like “Mosiah 2-5”.")
+st.caption('Tip: Choose a Scripture set, then pick book + chapter — or enter a theme/range like "Mosiah 2-5".')
