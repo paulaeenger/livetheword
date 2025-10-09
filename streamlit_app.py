@@ -262,3 +262,18 @@ if result:
         st.code(md, language="markdown")
 
 st.caption('Tip: Choose a Scripture set, then pick book + chapter — or enter a theme/range like "Mosiah 2-5".')
+
+# === talks loader ===
+import pandas as pd
+import streamlit as st
+
+def load_talks():
+    for enc in ("utf-8", "utf-8-sig", "cp1252"):
+        try:
+            return pd.read_csv("talks.csv", encoding=enc)
+        except UnicodeDecodeError:
+            continue
+    st.error("Could not read talks.csv (encoding issue). Try converting it to UTF-8.")
+    st.stop()
+
+talks_df = load_talks()
