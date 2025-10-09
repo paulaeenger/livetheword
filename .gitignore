@@ -6,3 +6,6 @@ dist/
 tmp/
 *.log
 .env
+
+.streamlit/credentials.toml
+.streamlit/machine_id_v4
