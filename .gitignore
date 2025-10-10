@@ -9,3 +9,5 @@ tmp/
 
 .streamlit/credentials.toml
 .streamlit/machine_id_v4
+.streamlit/secrets.toml
+.env

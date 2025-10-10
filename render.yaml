@@ -1,12 +1,12 @@
 services:
   - type: web
-    name: livetheword
-    env: docker
+    name: live-the-word
+    env: python
     plan: free
-    autoDeploy: true
     region: oregon
-    dockerfilePath: ./Dockerfile
-    healthCheckPath: /
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
+    autoDeploy: true
     envVars:
       - key: OPENAI_API_KEY
         sync: false
